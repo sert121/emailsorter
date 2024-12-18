@@ -1,6 +1,6 @@
 import csv
 import os
-
+from openai import OpenAI
 
 def load_existing_data(csv_file):
     """Load data from the CSV file."""
@@ -49,7 +49,7 @@ def check_relevance_with_gpt(existing_row, email_doc):
         temperature=0
     )
     
-    answer = response["choices"][0]["message"]["content"].strip()
+    answer = response.choices[0].message.content
     if 'yes' in answer.lower():
         return True
     return False
