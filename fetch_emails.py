@@ -10,12 +10,16 @@ from helpers import gpt_filter, get_body, get_full_email_details
 import base64 
 from datetime import datetime, timedelta
 
+from datetime import datetime, timedelta
+import time
 
 # Load environment variables
 load_dotenv()
 
 # Define Gmail API scope
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+CSV_FILE = "job_applications.csv"
+
 
 SENDER_KEYWORDS = r"recruiter|careers|hiring|@company\.com"  # Add more domains/keywords
 NO_REPLY_REGEX = r"^(no-?reply|donotreply|noreply)[\w.-]*@"
@@ -62,27 +66,34 @@ def filter_email(sender, subject):
 
 
  
-def fetch_emails(service, max_results=150, days=None, hours=None):
-    """Fetch emails using Gmail API within a time range."""
+def fetch_emails(service, max_results=150, days=None, hours=None, unread_only=False):
     query = ""
 
-    # Dynamically construct query based on the time range
-    if days:
-        query += f"newer_than:{days}d "
+    # Add 'is:unread' filter for unread emails
+    if unread_only:
+        query += "is:unread "
+
+    # Add 'after' filter for time range
     if hours:
-        now = datetime.now()
+        now = datetime.utcnow()  # Use UTC time for consistency
         past_time = now - timedelta(hours=hours)
-        query += f"after:{past_time.strftime('%Y/%m/%d')} "
+        unix_timestamp = int(time.mktime(past_time.timetuple()))
+        query += f"after:{unix_timestamp} "
 
-    print(f"Query: {query.strip()}")  # Debugging: Show constructed query
+    query = query.strip()
+    print(f"Query: {query}")  # Debugging: Output the constructed query
 
-    # Add the query to the list method
-    results = service.users().messages().list(userId='me', maxResults=max_results, q=query.strip()).execute()
-    messages = results.get('messages', [])
-    return messages
+    # Fetch messages
+    try:
+        results = service.users().messages().list(userId='me', maxResults=max_results, q=query).execute()
+        messages = results.get('messages', [])
+        print(f"Found {len(messages)} messages.")
+        return messages
+    except Exception as e:
+        print(f"Error fetching emails: {e}")
+        return []
 
     
-
 def list_emails(service):
     results = service.users().messages().list(userId='me', maxResults=10).execute()
     messages = results.get('messages', [])
@@ -106,7 +117,7 @@ def main():
     db = client.email_app
     collection = db.filtered_emails
     # Fetch and filter emails
-    messages = fetch_emails(service)
+    messages = fetch_emails(service, unread_only=0, hours=1)
     print("Filtering emails...")
     for msg in messages:
 
@@ -129,6 +140,8 @@ def main():
                     "round": filtered_info.get('round', "NA"),
                 }
                 saved_dictionaries.append(email_doc)
+                update_or_add_job(CSV_FILE, email_doc)
+                
                 collection.insert_one(email_doc)
                 print(f"Saved: {sender} | {subject} | Filter: {filter_result}")
 
