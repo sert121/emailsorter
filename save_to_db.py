@@ -77,17 +77,17 @@ def update_or_add_job(csv_file, email_doc):
             break
 
 
-    # Use GPT relevance check if no exact match was found
+    # Use LLM calls to relevance check if no exact match was found
     if not updated:
         for row in existing_data:
             is_relevant = check_relevance_with_gpt(row, email_doc)
             if is_relevant:
-                # Update relevant fields based on GPT relevance
+                # Update relevant fields based on relevance from LLM
                 row["Body Snippet"] = email_doc["snippet"]
                 row["Category"] = email_doc.get("category", "NA")
                 row["Decision"] = email_doc.get("decision", "NA")
                 row["Round"] = email_doc.get("round", "NA")
-                row["Status"] = "Updated (GPT Matched)"  # Mark as GPT matched
+                row["Status"] = "Updated"  # Mark as 
                 updated = True
                 break
 
